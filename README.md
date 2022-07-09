@@ -42,7 +42,7 @@ Cuando se realice el _fork_ se han de crear **dos carpetas**:
 
 
 	- RC0: Los clientes solo pueden enviar mensajes de texto. Éstos no tienen límite.
-	- RC1: El cliente será una aplicación de consola.
+	- RC1: El cliente será una aplicación que puede ser tanto una CLI, TUI o GUI.
 	- RC2: Las personas, una vez abren su cliente, tendrán un menú con diferentes opciones.
 		- R2.0: Permitirá añadir nuevos servidores.
 		- R2.1: Permitirá usar un servidor.
