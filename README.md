@@ -30,24 +30,24 @@ Cuando se realice el _fork_ se han de crear **dos carpetas**:
 
 ## Requisitos Básicos
 
-	- RSIS0: El sistema estará desarrollado en C, C++, Rust o Python.
-	- RSIS1: El sistema necesitará tener un cifrado asimétrico.
-	- RSIS2: El sistema usará la tecnología de sockets para el envío y recepción de mensajes.
+	- [ ] RSIS0: El sistema estará desarrollado en C, C++, Rust o Python.
+	- [ ] RSIS1: El sistema necesitará tener un cifrado asimétrico.
+	- [x] RSIS2: El sistema usará la tecnología de sockets para el envío y recepción de mensajes.
 
 
-	- RS0: Un servidor representa una sala.
-	- RS1: El servidor tendrá su propio logger, donde se encuentren todos los movimientos.
-	- RS2: El servidor realizará un handshacke que constará como mínimo de dos pasos antes de poder añadir a un cliente a la sala.
-	- RS3: EL servidor debe identificar a cada cliente con un nickname.
+	- [x] RS0: Un servidor representa una sala.
+	- [ ] RS1: El servidor tendrá su propio logger, donde se encuentren todos los movimientos.
+	- [x] RS2: El servidor realizará un handshacke que constará como mínimo de dos pasos antes de poder añadir a un cliente a la sala.
+	- [x] RS3: EL servidor debe identificar a cada cliente con un nickname.
 
 
-	- RC0: Los clientes solo pueden enviar mensajes de texto. Éstos no tienen límite.
-	- RC1: El cliente será una aplicación que puede ser tanto una CLI, TUI o GUI.
-	- RC2: Las personas, una vez abren su cliente, tendrán un menú con diferentes opciones.
-		- R2.0: Permitirá añadir nuevos servidores.
-		- R2.1: Permitirá usar un servidor.
-		- R2.2: Permitirá escoger un servidor como predeterminado.
-	- RC3: El usuario podrá volver al menú con una combinación de teclas.
-	- RC4: El cliente tendrá un banner en ASCII cada vez que se abra el software.
-	- RC5: Toda configuración del cliente será guardada en un fichero de configuración.
-	- RC6: El cliente debe tener un fichero de configuración por defecto.
+	- [x] RC0: Los clientes solo pueden enviar mensajes de texto. Éstos no tienen límite.
+	- [x] RC1: El cliente será una aplicación que puede ser tanto una CLI, TUI o GUI.
+	- [ ] RC2: Las personas, una vez abren su cliente, tendrán un menú con diferentes opciones.
+		- [ ] R2.0: Permitirá añadir nuevos servidores.
+		- [ ] R2.1: Permitirá usar un servidor.
+		- [ ] R2.2: Permitirá escoger un servidor como predeterminado.
+	- [ ] RC3: El usuario podrá volver al menú con una combinación de teclas.
+	- [ ] RC4: El cliente tendrá un banner en ASCII cada vez que se abra el software.
+	- [ ] RC5: Toda configuración del cliente será guardada en un fichero de configuración.
+	- [ ] RC6: El cliente debe tener un fichero de configuración por defecto.
