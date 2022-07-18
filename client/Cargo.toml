@@ -1,0 +1,13 @@
+[package]
+name = "tui-client"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tui = { version = "0.18", features = ["crossterm"], default-features = false }
+crossterm = "0.23"
+rsa = "0.6.0"
+rand = "0.8.5"
+base64 = "0.13.0"
