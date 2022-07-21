@@ -1,4 +1,4 @@
-use std::net::{TcpStream, SocketAddrV4};
+use std::net::SocketAddrV4;
 
 use crate::custom_rsa::ClientRSA;
 
@@ -6,7 +6,7 @@ use crate::custom_rsa::ClientRSA;
 pub struct ClientConnection {
 	pub stream: SocketAddrV4,
 	pub rsa_key: ClientRSA,
-	pub buffer: Vec<(String, String)>
+	pub buffer: Vec<(Vec<u8>, Vec<u8>)>
 }
 
 impl ClientConnection {

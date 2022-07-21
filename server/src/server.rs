@@ -1,23 +1,13 @@
 // use std::io::Read;
 use std::collections::HashMap;
 use std::io::{prelude::*, BufReader};
-use std::iter::Zip;
-use std::net::{ TcpListener, SocketAddr, TcpStream, SocketAddrV4, Ipv4Addr, IpAddr };
-use std::time::Duration;
+use std::net::{ TcpListener, SocketAddr, TcpStream, SocketAddrV4, IpAddr };
 
-
-use rand::{Error, Rng};
+use rand::Rng;
 
 use crate::custom_rsa::{ RSA, ClientRSA };
 use crate::connection::ClientConnection;
-// #[path = "./connection.rs"] mod connection;
-// use crate::connection::Connection;
-
-#[derive(Debug)]
-pub enum ConnectionErrors {
-	ConnectionFailed,
-}
-
+use crate::logger::{Logger, self};
 
 #[derive(Debug, Clone)]
 pub struct Server {
@@ -25,28 +15,32 @@ pub struct Server {
 	socket: SocketAddr,
 	key: RSA,
 	client_collection: HashMap<String, ClientConnection>,
+	logger: Logger
 }
 
 impl Server {
-	pub fn new(name: String, socket: SocketAddr) -> Server {
+	pub fn new(name: String, socket: SocketAddr, logger: Logger) -> Server {
 		Server {
 			name,
 			socket,
 			key: RSA::new(),
 			client_collection: HashMap::new(),
+			logger
 		}
 	}
 
 	pub fn connect(&self) -> TcpListener {
 		if let Ok(conn) = TcpListener::bind(self.socket) {
-			println!("Server {} - connected to {}", self.name, self.socket);
+			let msg = format!("Server {} - started on {}", self.name, self.socket);
+			println!("{}", msg);
+			logger::write_log(&self.logger, msg);
 			conn
 		} else {
-			panic!("Couldn't connect to server...");
+			logger::write_issue_log(&self.logger, "Couldn't connect to server...".to_owned());
+			panic!();
 		}
 	}
 
-	// TODO: This is the .incoming() where we do the swap of cyphers.
 	pub fn listen(&mut self) {
 		let listener = self.connect();
 
@@ -56,35 +50,37 @@ impl Server {
 					self.recv_string(stream);
 				}
 				Err(e) => {
-					println!("Error: {}", e);
+					logger::write_issue_log(&self.logger, format!("Error: {}", e));
 				}
 			}
 		}
 	}
 
-	// TODO: Encrypt this
-	fn buffer_it(&mut self, sender: &String, msg: &String) -> Result<(), ConnectionErrors> {
+	fn buffer_it(&mut self, sender: &String, msg: &String) {
 		for (name, client_connection) in &mut self.client_collection {
-			println!("sender: {} - {}", sender, name);
 			if sender == name { continue; }
 			else {
-				client_connection.buffer.push((sender.clone(), msg.clone()));
-				println!("Mensajes para {}: {:?}", name, client_connection.buffer);
+				let s = client_connection.rsa_key.encrypt(&sender.clone());
+				let m = client_connection.rsa_key.encrypt(&msg.clone());
+				client_connection.buffer.push((s, m));
 			}
 		}
-		Ok(())
 	}
 
 	fn fetch_it(&mut self, reciver: &String) -> String {
 		match self.client_collection.get_mut(reciver) {
 			Some(c) => {
-				println!("Mensajes para {}: {:?}", reciver, c.buffer);
-				let buff: Vec<(String, String)> = c.buffer
+				let buff: Vec<(Vec<u8>, Vec<u8>)> = c.buffer
 					.drain(..)
 					.collect();
 				let mut msg: String = buff
 					.iter()
-					.map(|b| format!("{} :=> {} - ", b.0.clone(), b.1.clone()))
+					.map(|b| {
+						let name = base64::encode(b.0.clone());
+						let msg = base64::encode(b.1.clone());
+
+						format!("{} :=> {} - ", name, msg)
+					})
 					.collect();
 				
 				msg += " - finished";
@@ -100,14 +96,11 @@ impl Server {
 	}
 
 	fn recv_string(&mut self, mut stream: &TcpStream) {
-		println!("----------\nConnection established with {}", stream.peer_addr().unwrap());
-		// stream.set_read_timeout(Some(Duration::new(5, 500))).unwrap();
-		// stream.set_write_timeout(Some(Duration::new(5, 500))).unwrap();
+		logger::write_log(&self.logger, format!("Connection established with {}", stream.peer_addr().unwrap()));
 		
 		let mut reader = BufReader::new(&mut stream);
 		let mut str_buff: String = "".to_string();
 
-		// TODO: HAY QUE HACERLO ASI, realizar las últimas modificaciones
 		while !str_buff.contains("- finished") {
 			reader.read_line(&mut str_buff).unwrap();			
 		}
@@ -122,12 +115,12 @@ impl Server {
 			let client_rsa = ClientRSA::new(vec[2].to_string());
 			let ip = stream.peer_addr().unwrap().ip();
 			if let IpAddr::V4(ipv4) = ip {
-				// here ipv4 is of type IpV4Addr
+				// ipv4 is of type IpV4Addr
 				let port = Server::assign_port();
 				let tcp_sock = SocketAddrV4::new(ipv4, port);
 				self.client_collection.insert(name.clone(), ClientConnection::new(tcp_sock, client_rsa.clone()));
 	
-				println!("> Added new collection");
+				logger::write_log(&self.logger, "> Added new client to collection".to_owned());
 				let hand = client_rsa.encrypt(&msg);
 				let name = client_rsa.encrypt(&self.name.to_string().clone());
 				let port = client_rsa.encrypt(&port.to_string());
@@ -135,7 +128,7 @@ impl Server {
 				let name = base64::encode(name);
 				let hand = base64::encode(hand);
 				let port = base64::encode(port);
-				// println!("{} -> {}", name, tcp_sock);
+
 				let msg = format!("{} - {} - {} - {} - finished", name, port, hand, self.key.get_public_key());
 				writeln!(stream, "{}", msg).unwrap();
 			}
@@ -149,62 +142,16 @@ impl Server {
 			let name = std::str::from_utf8(&name).unwrap();
 			let msg = std::str::from_utf8(&msg).unwrap();
 
-			println!("client name: {}", name);
 			if self.client_collection.contains_key(name) {
-				// println!("Decrypted: {} - {}", name, msg);
-				// TODO: FORWARD MESSAGE TO OTHER CLIENTS
-				//self.send_string(decrypted_msg)
 				if msg == "fetch".to_string() {
-					println!("Fetching...");
+					logger::write_log(&self.logger, format!("{} fetching...", stream.peer_addr().unwrap()));
 					let msg = self.fetch_it(&name.to_string());
-					// println!("Fetched. Sending...");
-					// println!("msg: {}", msg);
 					writeln!(stream, "{}", msg).unwrap();
-					println!("Sended.");
+					logger::write_log(&self.logger, format!("{} messages sent", stream.peer_addr().unwrap()));
 				} else {
-					self.buffer_it(&name.to_string(), &msg.to_string()).unwrap();
+					self.buffer_it(&name.to_string(), &msg.to_string());
 				}
 			}
 		}
-
-		println!("Done.\n----------");
 	}
-/*
-	fn connect_handshake(&self, ip: SocketAddr) -> Result<TcpStream, ConnectionErrors> {
-		if let Ok(conn) = TcpStream::connect(ip) {
-			Ok(conn)
-		} else {
-			Err(ConnectionErrors::ConnectionFailed)
-		}
-	}
-
-	pub fn send_handshake_id (&self, msg: String, ip: SocketAddr) {
-		self.send_handshake(format!("{} - {}", self.name.to_string(), msg), ip);
-	}
-
-	// TODO: Send junk so that middleman is just like WTF
-	// TODO: Asymetric encryption (hole) OwO
-	fn send_handshake(&self, data: String, ip: SocketAddr) {
-		// let data_mut =  format!("{}> {}", self.name, data.clone().as_str());
-		// .write(&data_mut.as_bytes())
-		match &mut self.connect_handshake(ip) {
-			Ok(stream) => {
-				println!("Sending: {}", data);
-
-				stream.write(&data.as_bytes()).unwrap();
-			}
-			Err(e) => println!("Error: {:?}", e),
-		}
-	}
-*/
-
-	/*
-	fn fordward_msg(&mut self, msg: String) {
-		for (name, client_rsa) in self.client_collection.iter_mut() {
-			let encrypted_msg = client_rsa.encrypt(&msg);
-			self.send_string(format!("{} - {}", name, encrypted_msg));
-		}
-	}
-	*/
 }
-

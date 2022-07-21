@@ -1,4 +1,3 @@
-use rsa::pkcs1::DecodeRsaPublicKey;
 use rsa::{ PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme };
 use rsa::{ pkcs8::EncodePrivateKey, pkcs8::EncodePublicKey, pkcs8::LineEnding, pkcs8::DecodePublicKey };
 use rand::{ thread_rng };
@@ -47,6 +46,7 @@ impl RSA {
 		}
 	}
 
+	#[warn(dead_code)]
 	fn print(&self) {
 		let private = self.priv_key.to_pkcs8_pem(LineEnding::LF)
 			.unwrap().to_string();
