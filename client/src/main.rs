@@ -1,10 +1,13 @@
+use std::io::Write;
 use std::sync::mpsc::{TryRecvError, self};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use std::{io, thread};
-use std::net::{ Ipv4Addr, SocketAddr, SocketAddrV4 };
+use std::{io, thread, fs, env};
 
-use rand::Rng;
+use tui::layout::Alignment;
+use tui::style::{Style, Color};
+use tui::text::Text;
+use tui::widgets::{Paragraph, Block, Borders, Wrap};
 use tui::{
     backend::CrosstermBackend,
     Terminal,
@@ -31,20 +34,34 @@ use crossterm::{
         CursorShape
     }
 };
-use ui::input::ChatMessages;
 
 mod ui;
 mod network;
+mod config;
 
 use crate::ui::*;
-use crate::network::client::{Client, Connection};
+use crate::network::client::Client;
 
-const PORT : u16 = 8081;
-const ADDR : Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1); 
+const CONF_FILE: &str = "s-conf.yaml";
 
 // https://docs.rs/tui/latest/tui/
 // https://docs.rs/crossterm/latest/crossterm/event/struct.KeyEvent.html
 fn main() -> Result<(), io::Error> {
+    // search configuration
+    let path = env::current_dir()?;
+    let path = path.join(CONF_FILE);
+
+    if !path.exists() {
+        // create default configuration
+        let conf = config::default_configuration();
+        let mut file = fs::File::create(CONF_FILE).unwrap();
+        file.write_all(conf.as_bytes()).unwrap();
+    }
+
+    let conf = fs::read_to_string(path.clone()).unwrap();
+    let mut conf = config::read_configuration(conf);
+    // TODO: Recoger en servidor y cliente una clave para enviar la clave publica
+
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -57,14 +74,48 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let random = rand::random::<u8>();
-    let mut me: Client = Client::new(format!("rusty child {}", random), None);
+    if !conf.has_default_server() {
+        loop {
+            terminal.draw(|f| {
+                let style = Style::default()
+                    .fg(Color::LightRed);
+                let txt = Text::styled("Default server needed, please set value on configuration file.\n('q' to exit)", style);
+                
+                let par = Paragraph::new(
+                    txt
+                )
+                    .block(
+                        Block::default()
+                            .borders(Borders::NONE)
+                    )
+                    .alignment(Alignment::Center)
+                    .wrap(Wrap { trim: true });   
 
-    // TODO: check if there are errors
-    me.first_hand_shake();
+                f.render_widget(par, f.size());
+            })?;
+            let event = read()?;
+            
+            match event {
+                Event::Key(e) => {
+                    if KeyCode::Char('q') == e.code {
+                        execute!(
+                            terminal.backend_mut(),
+                            LeaveAlternateScreen,
+                            DisableMouseCapture,
+                            SetCursorShape(CursorShape::Line)  
+                        )?;
+                    
+                        terminal.show_cursor()?;
+                        disable_raw_mode()?;
+                        
+                        return Ok(());
+                    }
+                },
+                _ => {}
+            }
+        }
+    }
     
-    me.send_string_id("Buenos días a todos!!".to_string());
-
     loop {
         terminal.draw(|f| {
             first_page::first_page(f);
@@ -75,6 +126,17 @@ fn main() -> Result<(), io::Error> {
         match event {
             Event::Key(event) => {
                 if KeyCode::Char('c') == event.code {
+                    let mut me: Client = Client::new(conf.get_nick(), conf.get_default_server());
+
+                    match me.first_hand_shake() {
+                        Ok(_) => (),
+                        Err(e) => {
+                            panic!("Error: {:?}", e);
+                        },
+                    }
+                    
+                    me.send_string_id("Buenos días a todos!!".to_string()).unwrap();                
+
                     let (tx, rx) = mpsc::channel();
 
                     let client = Arc::new( Mutex::new(me.clone()));
@@ -82,7 +144,7 @@ fn main() -> Result<(), io::Error> {
 
                     let c = Arc::clone(&client);
                     let msg_copy = Arc::clone(&msg);
-                    let recv_msgs = thread::spawn(move || loop {
+                    thread::spawn(move || loop {
                         match c.try_lock() {
                             Ok(mut f) => {
                                 match msg_copy.try_lock() {
@@ -92,14 +154,14 @@ fn main() -> Result<(), io::Error> {
                                         *m = res;
                                         std::mem::drop(m);
                                     },
-                                    Err(err) => {
+                                    Err(_) => {
                                         // println!("Inside err: {:?}", err);
                                     }
                                 }
 
                                 std::mem::drop(f);
                             },
-                            Err(err) => {
+                            Err(_) => {
                                 // println!("Outside err: {:?}", err);
                             },
                         }
@@ -118,8 +180,10 @@ fn main() -> Result<(), io::Error> {
                     let _ = tx.send(());
                     // recv_msgs.join().unwrap();
                 }
-                else if KeyCode::Char('n') == event.code {}
-                else if KeyCode::Char('s') == event.code {}
+                else if KeyCode::Char('s') == event.code {
+                    listserver_page::render_servers(&mut terminal, &mut conf)?;
+                    config::save_configuration(&conf, path.clone());
+                }
                 else if KeyCode::Char('q') == event.code {
                     execute!(
                         terminal.backend_mut(),

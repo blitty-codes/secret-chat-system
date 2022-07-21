@@ -47,6 +47,7 @@ impl RSA {
 		}
 	}
 
+	#[warn(dead_code)]
 	fn print(&self) {
 		let private = self.priv_key.to_pkcs8_pem(LineEnding::LF)
 			.unwrap().to_string();

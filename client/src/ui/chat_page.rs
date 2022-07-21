@@ -1,15 +1,9 @@
-use std::borrow::BorrowMut;
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Mutex};
-use std::{time::Duration, sync::Arc};
-use std::{num, thread, vec};
+use std::{time::Duration, sync::{Arc, Mutex}};
 use crossterm::event::{
     self,
     Event,
     KeyCode
 };
-use rand::thread_rng;
-use rsa::pkcs8::der::bigint::generic_array::typenum::private::IsGreaterPrivate;
 use tui::{
     backend::Backend,
     layout::{
@@ -21,7 +15,7 @@ use tui::{
     Terminal
 };
 
-use crate::network::client::{Client, self};
+use crate::network::client::Client;
 use crate::input::*;
 use crate::components::{
     menu,
@@ -98,8 +92,6 @@ pub fn chat_layout<B: Backend> (terminal: &mut Terminal<B>, me: &mut Client, msg
     let conf = &mut Configuration::default();
 
     loop {
-        // conf.chat.messages = chat.messages.clone();
-        // println!("{:?}", conf.chat.mode);
         terminal.draw(|f| ui(f, conf))?;
 
         if conf.chat.mode == InputMode::Normal {
@@ -113,16 +105,11 @@ pub fn chat_layout<B: Backend> (terminal: &mut Terminal<B>, me: &mut Client, msg
         match msg.try_lock() {
             Ok(mut m) => {
                 conf.chat.messages.append(&mut (*m.clone()).to_vec());
-                // println!("conf.chat.msg: {:?}", conf.chat.messages);
-                // println!("msg: {:?}", *msg);
-                // .drain(..) not working
                 *m = Vec::new();
                 std::mem::drop(m);
             },
-            // TODO: 
-            Err(e) => {
-                // panic!("Lock failed: {}", e);
-            },
+            // TODO: logger
+            Err(_) => {},
         }
 
         if event::poll(Duration::from_millis(100))? {
@@ -146,7 +133,7 @@ pub fn chat_layout<B: Backend> (terminal: &mut Terminal<B>, me: &mut Client, msg
                                         (me.get_name().to_string(), msg.clone())
                                     );
 
-                                    me.send_string_id(msg);
+                                    me.send_string_id(msg).unwrap();
                                 }
                                 KeyCode::Char(c) => {
                                     conf.chat.input.push(c);

@@ -49,7 +49,6 @@ pub fn chat_render (conf: Configuration) -> Paragraph<'static> {
             }
         }
 
-        // println!("min: {} - max: {} - len: {} - offset: {} - height: {}", min, max, chat.messages.len(), scroll.offset as usize, scroll.area_height as usize);
         msg = chat.messages[min..max].to_vec();
         messages = get_span(msg);
     } else {
